@@ -158,7 +158,7 @@ class UNETR(nn.Module):
 
     def forward(self, x_in):
         x = self.patch_embedding(x_in)
-        mask = None
+        mask = None  # in case of unsupervised pretraining, this will bee needed by the loss to mask out unmasked patches.
         if self.masked_pretrain:
             noise = torch.rand(x.shape[:2], device=x.device)
             mask = torch.ones(x.shape[:2], device=x.device)
