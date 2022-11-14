@@ -12,7 +12,10 @@
 from typing import Tuple
 
 import torch.nn as nn
+import torch
 
+from UNETR.utils import trunc_normal_
+from UNETR.patchembedding_blocks import PatchEmbeddingBlock
 from UNETR.unetr_blocks import UnetResBlock, UnetrPrUpBlock, UnetrUpBlock
 from UNETR.unet_blocks import UnetOutBlock
 from UNETR.vit import ViT
@@ -35,6 +38,8 @@ class UNETR(nn.Module):
         num_heads: int = 12,
         conv_block: bool = False,
         dropout_rate: float = 0.0,
+        masked_pretrain = False,
+        masking_ratio = 0.75
     ) -> None:
 
         super().__init__()
@@ -49,18 +54,28 @@ class UNETR(nn.Module):
         self.num_layers = 12
         self.patch_size = (16,) * self.spatial_dims
         self.feat_size = tuple((simg // spatch for simg, spatch in zip(img_size, self.patch_size)))
+        self.n_patches = torch.tensor(self.feat_size).prod().item()
         self.hidden_size = hidden_size
         self.classification = False
-        self.vit = ViT(
-            spatial_dims=self.spatial_dims,
+        self.masked_pretrain = masked_pretrain
+        self.masking_ratio = masking_ratio
+        self.n_unmasked = round(self.n_patches * (1 - self.masking_ratio))
+        self.position_decoder_embed = nn.Parameter(torch.zeros(1, self.n_patches, hidden_size))
+        trunc_normal_(self.position_decoder_embed, mean=0.0, std=0.02, a=-2.0, b=2.0)
+        self.patch_embedding = PatchEmbeddingBlock(
             in_channels=in_channels,
             img_size=img_size,
             patch_size=self.patch_size,
             hidden_size=hidden_size,
+            num_heads=num_heads,
+            dropout_rate=dropout_rate,
+            spatial_dims=self.spatial_dims,
+        )
+        self.vit = ViT(
+            hidden_size=hidden_size,
             mlp_dim=mlp_dim,
             num_layers=self.num_layers,
             num_heads=num_heads,
-            classification=self.classification,
             dropout_rate=dropout_rate,
         )
         self.encoder1 = UnetResBlock(
@@ -100,6 +115,8 @@ class UNETR(nn.Module):
             upsample_kernel_size=2,
             conv_block=conv_block
         )
+        if self.masked_pretrain:
+            self.mask_token = nn.Parameter(torch.zeros((1, 1, hidden_size)))
         self.decoder5 = UnetrUpBlock(
             spatial_dims=self.spatial_dims,
             in_channels=hidden_size,
@@ -140,18 +157,36 @@ class UNETR(nn.Module):
         return x
 
     def forward(self, x_in):
-        x, hidden_states_out = self.vit(x_in)
-        enc1 = self.encoder1(x_in)
+        x = self.patch_embedding(x_in)
+        mask = None  # in case of unsupervised pretraining, this will bee needed by the loss to mask out unmasked patches.
+        if self.masked_pretrain:
+            noise = torch.rand(x.shape[:2], device=x.device)
+            mask = torch.ones(x.shape[:2], device=x.device)
+            ids_shuffle = torch.argsort(noise, dim=1)
+            ids_restore = torch.argsort(ids_shuffle, dim=1)
+            ids_keep = ids_shuffle[:, :self.n_unmasked]
+            x = torch.gather(x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, self.hidden_size))
+            mask[:, :self.n_unmasked] = 0
+            mask = torch.gather(mask, dim=1, index=ids_restore)
+        x, hidden_states_out = self.vit(x)
         x2 = hidden_states_out[3]
-        enc2 = self.encoder2(self.proj_feat(x2, self.hidden_size, self.feat_size))
         x3 = hidden_states_out[6]
-        enc3 = self.encoder3(self.proj_feat(x3, self.hidden_size, self.feat_size))
         x4 = hidden_states_out[9]
+        if self.masked_pretrain:  # we have to do this here, since after the decoders it is not possible to randomly subsample patches in different resolutions such that the exact same image regions are masked.
+            mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
+            x = torch.gather(torch.cat([x, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2])) + self.position_decoder_embed
+            x2 = torch.gather(torch.cat([x2, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x2.shape[2])) + self.position_decoder_embed
+            x3 = torch.gather(torch.cat([x3, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x3.shape[2])) + self.position_decoder_embed
+            x4 = torch.gather(torch.cat([x4, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x4.shape[2])) + self.position_decoder_embed
+        enc1 = self.encoder1(x_in)
+        enc2 = self.encoder2(self.proj_feat(x2, self.hidden_size, self.feat_size))
+        enc3 = self.encoder3(self.proj_feat(x3, self.hidden_size, self.feat_size))
         enc4 = self.encoder4(self.proj_feat(x4, self.hidden_size, self.feat_size))
+
         dec4 = self.proj_feat(x, self.hidden_size, self.feat_size)
         dec3 = self.decoder5(dec4, enc4)
         dec2 = self.decoder4(dec3, enc3)
         dec1 = self.decoder3(dec2, enc2)
         out = self.decoder2(dec1, enc1)
         logits = self.out(out)
-        return logits
+        return logits, mask
