@@ -25,6 +25,11 @@ class UNETR(nn.Module):
     """
     UNETR based on: "Hatamizadeh et al.,
     UNETR: Transformers for 3D Medical Image Segmentation <https://arxiv.org/abs/2103.10504>"
+    For this code, 
+    https://github.com/facebookresearch/mae/tree/efb2a8062c206524e35e47d04501ed4f544c0ae8
+    and
+    https://github.com/Project-MONAI/research-contributions/tree/main/UNETR/BTCV
+    where used as starting points.
     """
 
     def __init__(
@@ -189,4 +194,6 @@ class UNETR(nn.Module):
         dec1 = self.decoder3(dec2, enc2)
         out = self.decoder2(dec1, enc1)
         logits = self.out(out)
-        return logits, mask
+        if self.masked_pretrain: 
+            return logits, mask
+        return logits
