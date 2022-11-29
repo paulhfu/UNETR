@@ -3,7 +3,7 @@ from UNETR.model import UNETR
 from UnetPretrained.unet import UNet2d
 import torch_em
 from torch_em.data.datasets import get_livecell_loader
-
+#https://bioimage.io/#/?tags=Livecell&id=10.5281%2Fzenodo.5869899
 
 def eval2DUnet():
     patch_shape = [512, 512]
