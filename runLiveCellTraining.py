@@ -6,8 +6,10 @@ from torch_em.data.datasets import get_livecell_loader
 
 def train_boundaries():
     n_out = 2
-    patch_shape = (64, 64)
-    batch_size = 1
+    patch_shape = (512, 512)
+    batch_size = 5
+    #patch_shape = (384, 384)
+    #batch_size = 3
     model = UNETR(
           in_channels=1,
           out_channels=n_out,
@@ -17,15 +19,15 @@ def train_boundaries():
           mlp_dim = 3072,
           num_heads = 12,
           conv_block = True,
-          dropout_rate = 0.0,
+          dropout_rate = 0.1,
           masked_pretrain = False)
 
     train_loader = get_livecell_loader(
-        "/home/drford/data", patch_shape, "train",
+        "/nfs/home/e7faffa3966db4c3/data", patch_shape, "train",
         download=True, boundaries=True, batch_size=batch_size
     )
     val_loader = get_livecell_loader(
-        "/home/drford/data", patch_shape, "val",
+        "/nfs/home/e7faffa3966db4c3/data", patch_shape, "val",
         boundaries=True, batch_size=batch_size
     )
     loss = torch_em.loss.DiceLoss()
@@ -38,15 +40,12 @@ def train_boundaries():
         loss=loss,
         metric=loss,
         learning_rate=1e-4,
-        device=torch.device("cpu"),
+        device=torch.device("cuda"),
         mixed_precision=True,
         log_image_interval=50
     )
-    trainer.fit(iterations=5)
+    trainer.fit(iterations=50000)
 
 
 if __name__ == '__main__':
-    parser = torch_em.util.parser_helper(
-        default_batch_size=8
-    )
     train_boundaries()
