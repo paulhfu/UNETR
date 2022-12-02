@@ -23,11 +23,15 @@ def train_boundaries():
           masked_pretrain = False)
 
     train_loader = get_livecell_loader(
-        "/nfs/home/e7faffa3966db4c3/data", patch_shape, "train",
+        #"/nfs/home/e7faffa3966db4c3/data", 
+        "~/data/images",
+        patch_shape, "train",
         download=True, boundaries=True, batch_size=batch_size
     )
     val_loader = get_livecell_loader(
-        "/nfs/home/e7faffa3966db4c3/data", patch_shape, "val",
+        #"/nfs/home/e7faffa3966db4c3/data", 
+        "~/data/images",
+        patch_shape, "val",
         boundaries=True, batch_size=batch_size
     )
     loss = torch_em.loss.DiceLoss()

@@ -4,15 +4,34 @@ from UnetPretrained.unet import UNet2d
 import torch_em
 from torch_em.data.datasets import get_livecell_loader
 from tqdm import tqdm
+import random
+import numpy as np
+torch.manual_seed(0)
+np.random.seed(0)
+random.seed(0)
 #https://bioimage.io/#/?tags=Livecell&id=10.5281%2Fzenodo.5869899
 
 @torch.no_grad()
 def eval2DUnet():
     patch_shape = [512, 512]
     batch_size = 10
+    
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        torch.manual_seed(0)
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+
+    g = torch.Generator()
+    g.manual_seed(0)
+    
     test_loader = get_livecell_loader(
-        "/nfs/home/e7faffa3966db4c3/data", patch_shape, "test",
-        boundaries=True, batch_size=batch_size
+        #"/nfs/home/e7faffa3966db4c3/data", 
+        "~/data/images",
+        patch_shape, "test",
+        boundaries=True, batch_size=batch_size,
+        worker_init_fn=seed_worker,
+        generator=g
     )
     
     model = UNet2d(
@@ -29,21 +48,39 @@ def eval2DUnet():
     model = model.cuda()
     model = model.eval()
     loss = torch_em.loss.DiceLoss()
-    cumLoss = 0.0
+    dice_fg, dice_bnd = 0.0, 0.0
     for src, tgt in tqdm(test_loader):
         src = src.to(torch.device("cuda"))
         tgt = tgt.to(torch.device("cuda"))
-        cumLoss += loss(model(src), tgt)
-    cumLoss /= len(test_loader)
-    print(f"Unet Cum test score: {1 - cumLoss}")
+        pred = model(src)
+        dice_fg += loss(pred[:, 0], tgt[:, 0])
+        dice_bnd += loss(pred[:, 1], tgt[:, 1])
+    dice_fg /= len(test_loader)
+    dice_bnd /= len(test_loader)
+    print(f"Unet Foreground test score: {1 - dice_fg}")
+    print(f"Unet Boundary test score: {1 - dice_bnd}")
 
 @torch.no_grad()
 def eval2DUnetR():
     patch_shape = [512, 512]
     batch_size = 30
+    
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        torch.manual_seed(0)
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+
+    g = torch.Generator()
+    g.manual_seed(0)
+    
     test_loader = get_livecell_loader(
-        "/nfs/home/e7faffa3966db4c3/data", patch_shape, "test",
-        boundaries=True, batch_size=batch_size
+        #"/nfs/home/e7faffa3966db4c3/data", 
+        "~/data/images",
+        patch_shape, "test",
+        boundaries=True, batch_size=batch_size,
+        worker_init_fn=seed_worker,
+        generator=g
     )
     
     model = UNETR(
@@ -62,13 +99,17 @@ def eval2DUnetR():
     model = model.eval()
     model = model.cuda()
     loss = torch_em.loss.DiceLoss()
-    cumLoss = 0.0
+    dice_fg, dice_bnd = 0.0, 0.0
     for src, tgt in tqdm(test_loader):
         src = src.to(torch.device("cuda"))
         tgt = tgt.to(torch.device("cuda"))
-        cumLoss += loss(model(src), tgt)
-    cumLoss /= len(test_loader)
-    print(f"UNETR Cum test score: {1 - cumLoss}")
+        pred = model(src)
+        dice_fg += loss(pred[:, 0], tgt[:, 0])
+        dice_bnd += loss(pred[:, 1], tgt[:, 1])
+    dice_fg /= len(test_loader)
+    dice_bnd /= len(test_loader)
+    print(f"UNETR Foreground test score: {1 - dice_fg}")
+    print(f"UNETR Boundary test score: {1 - dice_bnd}")
 
 if __name__ == '__main__':
     eval2DUnet()
