@@ -63,8 +63,8 @@ class PatchEmbeddingBlock(nn.Module):
             nn.init.constant_(m.weight, 1.0)
 
     def forward(self, x):
-        x = self.patch_embeddings(x)
+        x_patched = self.patch_embeddings(x)
         x = x.flatten(2).transpose(-1, -2)
         embeddings = x + self.position_embeddings
         embeddings = self.dropout(embeddings)
-        return embeddings
+        return embeddings, x_patched

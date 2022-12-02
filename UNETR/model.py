@@ -83,6 +83,9 @@ class UNETR(nn.Module):
             num_heads=num_heads,
             dropout_rate=dropout_rate,
         )
+        self.init_decoder(in_channels, feature_size, hidden_size, conv_block, out_channels)
+
+    def init_decoder(self, in_channels, feature_size, hidden_size, conv_block, out_channels):
         self.encoder1 = UnetResBlock(
             spatial_dims=self.spatial_dims,
             in_channels=in_channels,
@@ -152,6 +155,20 @@ class UNETR(nn.Module):
         )
         self.out = UnetOutBlock(spatial_dims=self.spatial_dims, in_channels=feature_size, out_channels=out_channels)  # type: ignore
 
+    def freeze_encoder(self):
+        for param in self.vit.parameters():
+            param.requires_grad = False
+            
+    def unfreeze_encoder(self):
+         for param in self.vit.parameters():
+            param.requires_grad = True    
+               
+    def disable_masking(self):
+        self.masked_pretrain = False
+        
+    def enable_masking(self):
+        self.masked_pretrain = True
+
     def proj_feat(self, x, hidden_size, feat_size):
         if self.spatial_dims == 3:
             x = x.view(x.size(0), feat_size[0], feat_size[1], feat_size[2], hidden_size)
@@ -162,7 +179,7 @@ class UNETR(nn.Module):
         return x
 
     def forward(self, x_in):
-        x = self.patch_embedding(x_in)
+        x, x_patched = self.patch_embedding(x_in)
         mask = None  # in case of unsupervised pretraining, this will bee needed by the loss to mask out unmasked patches.
         if self.masked_pretrain:
             noise = torch.rand(x.shape[:2], device=x.device)
@@ -195,5 +212,5 @@ class UNETR(nn.Module):
         out = self.decoder2(dec1, enc1)
         logits = self.out(out)
         if self.masked_pretrain: 
-            return logits, mask
+            return logits, mask, x_patched
         return logits

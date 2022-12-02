@@ -26,8 +26,8 @@ def eval2DUnet():
     g.manual_seed(0)
     
     test_loader = get_livecell_loader(
-        #"/nfs/home/e7faffa3966db4c3/data", 
-        "~/data/images",
+        "/nfs/home/e7faffa3966db4c3/data", 
+        #"~/data/images",
         patch_shape, "test",
         boundaries=True, batch_size=batch_size,
         worker_init_fn=seed_worker,
@@ -53,12 +53,14 @@ def eval2DUnet():
         src = src.to(torch.device("cuda"))
         tgt = tgt.to(torch.device("cuda"))
         pred = model(src)
-        dice_fg += loss(pred[:, 0], tgt[:, 0])
-        dice_bnd += loss(pred[:, 1], tgt[:, 1])
+        dice_fg += loss(pred[:, :1], tgt[:, :1])
+        dice_bnd += loss(pred[:, 1:], tgt[:, 1:])
     dice_fg /= len(test_loader)
     dice_bnd /= len(test_loader)
     print(f"Unet Foreground test score: {1 - dice_fg}")
+    #0.95185
     print(f"Unet Boundary test score: {1 - dice_bnd}")
+    #0.67479
 
 @torch.no_grad()
 def eval2DUnetR():
@@ -75,8 +77,8 @@ def eval2DUnetR():
     g.manual_seed(0)
     
     test_loader = get_livecell_loader(
-        #"/nfs/home/e7faffa3966db4c3/data", 
-        "~/data/images",
+        "/nfs/home/e7faffa3966db4c3/data", 
+        #"~/data/images",
         patch_shape, "test",
         boundaries=True, batch_size=batch_size,
         worker_init_fn=seed_worker,
@@ -104,12 +106,14 @@ def eval2DUnetR():
         src = src.to(torch.device("cuda"))
         tgt = tgt.to(torch.device("cuda"))
         pred = model(src)
-        dice_fg += loss(pred[:, 0], tgt[:, 0])
-        dice_bnd += loss(pred[:, 1], tgt[:, 1])
+        dice_fg += loss(pred[:, :1], tgt[:, :1])
+        dice_bnd += loss(pred[:, 1:], tgt[:, 1:])
     dice_fg /= len(test_loader)
     dice_bnd /= len(test_loader)
     print(f"UNETR Foreground test score: {1 - dice_fg}")
+    #0.95157
     print(f"UNETR Boundary test score: {1 - dice_bnd}")
+    #0.6635
 
 if __name__ == '__main__':
     eval2DUnet()
