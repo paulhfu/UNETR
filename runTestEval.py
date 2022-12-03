@@ -26,6 +26,7 @@ def eval2DUnet():
     g.manual_seed(0)
     
     test_loader = get_livecell_loader(
+        #"/home/e7faffa3966db4c3/data",
         "~/data",
         patch_shape, "test",
         boundaries=True, batch_size=batch_size,
@@ -76,6 +77,7 @@ def eval2DUnetR():
     g.manual_seed(0)
     
     test_loader = get_livecell_loader(
+        #"/home/e7faffa3966db4c3/data",
         "~/data",
         patch_shape, "test",
         boundaries=True, batch_size=batch_size,

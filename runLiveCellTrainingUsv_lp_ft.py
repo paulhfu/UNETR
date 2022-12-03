@@ -18,14 +18,16 @@ def train_boundaries():
           num_heads = 12,
           conv_block = True,
           dropout_rate = 0.1,
-          masked_pretrain = False)
+          masked_pretrain = True)
 
     train_loader = get_livecell_loader(
+        #"/home/e7faffa3966db4c3/data",
         "~/data",
         patch_shape, "train",
         download=True, boundaries=True, batch_size=batch_size
     )
     val_loader = get_livecell_loader(
+        #"/home/e7faffa3966db4c3/data",
         "~/data",
         patch_shape, "val",
         boundaries=True, batch_size=batch_size
