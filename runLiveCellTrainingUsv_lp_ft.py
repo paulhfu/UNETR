@@ -7,7 +7,7 @@ from torch_em.data.datasets import get_livecell_loader
 
 def train_boundaries():
     patch_shape = (512, 512)
-    batch_size = 5
+    batch_size = 15
     model = UNETR(
           in_channels=1,
           out_channels=1,
@@ -18,17 +18,18 @@ def train_boundaries():
           num_heads = 12,
           conv_block = True,
           dropout_rate = 0.1,
+          masking_ratio = 0.75,
           masked_pretrain = True)
 
     train_loader = get_livecell_loader(
-        #"/home/e7faffa3966db4c3/data",
-        "~/data",
+        "/home/e7faffa3966db4c3/data",
+        #"~/data",
         patch_shape, "train",
         download=True, boundaries=True, batch_size=batch_size
     )
     val_loader = get_livecell_loader(
-        #"/home/e7faffa3966db4c3/data",
-        "~/data",
+        "/home/e7faffa3966db4c3/data",
+        #"~/data",
         patch_shape, "val",
         boundaries=True, batch_size=batch_size
     )
@@ -44,9 +45,24 @@ def train_boundaries():
         learning_rate=1e-4,
         device=torch.device("cuda"),
         mixed_precision=True,
+        logger=None,
         log_image_interval=50
     )
     trainer.fit(iterations=100000)
+
+    batch_size = 5
+    train_loader = get_livecell_loader(
+        "/home/e7faffa3966db4c3/data",
+        #"~/data",
+        patch_shape, "train",
+        download=True, boundaries=True, batch_size=batch_size
+    )
+    val_loader = get_livecell_loader(
+        "/home/e7faffa3966db4c3/data",
+        #"~/data",
+        patch_shape, "val",
+        boundaries=True, batch_size=batch_size
+    )
 
     model.init_decoder(in_channels=1, feature_size=16, hidden_size=768, conv_block=True, out_channels=2)
     model.freeze_encoder()
