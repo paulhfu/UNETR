@@ -1,20 +1,16 @@
 import torch
 from UNETR.model import UNETR
-from UNETR.mae_loss import mae_loss
+from UNETR.mae_loss import MaeLoss
 import torch_em
 from torch_em.data.datasets import get_livecell_loader
 
 
 def train_boundaries():
-    n_out = 2
-    #patch_shape = (512, 512)
-    patch_shape = (64, 64)
-    batch_size = 1
-    #patch_shape = (384, 384)
-    #batch_size = 3
+    patch_shape = (512, 512)
+    batch_size = 5
     model = UNETR(
           in_channels=1,
-          out_channels=n_out,
+          out_channels=1,
           img_size=patch_shape,
           feature_size = 16,
           hidden_size = 768,
@@ -25,21 +21,19 @@ def train_boundaries():
           masked_pretrain = False)
 
     train_loader = get_livecell_loader(
-        #"/nfs/home/e7faffa3966db4c3/data", 
-        "~/data/images",
+        "~/data",
         patch_shape, "train",
         download=True, boundaries=True, batch_size=batch_size
     )
     val_loader = get_livecell_loader(
-        #"/nfs/home/e7faffa3966db4c3/data", 
-        "~/data/images",
+        "~/data",
         patch_shape, "val",
         boundaries=True, batch_size=batch_size
     )
-    loss = mae_loss
+    loss = MaeLoss(2, 16)
 
     trainer = torch_em.default_segmentation_trainer(
-        name="livecell-boundary-model",
+        name="livecell-mae",
         model=model,
         train_loader=train_loader,
         val_loader=val_loader,
@@ -50,14 +44,14 @@ def train_boundaries():
         mixed_precision=True,
         log_image_interval=50
     )
-    trainer.fit(iterations=1)
+    trainer.fit(iterations=100000)
 
-    model.reinit_decoder()
+    model.init_decoder(in_channels=1, feature_size=16, hidden_size=768, conv_block=True, out_channels=2)
     model.freeze_encoder()
     model.disable_masking()
     loss = torch_em.loss.DiceLoss()
     trainer = torch_em.default_segmentation_trainer(
-        name="livecell-boundary-model",
+        name="livecell-boundary-model-lp",
         model=model,
         train_loader=train_loader,
         val_loader=val_loader,
@@ -68,12 +62,12 @@ def train_boundaries():
         mixed_precision=True,
         log_image_interval=50
     )
-    trainer.fit(iterations=1)
+    trainer.fit(iterations=50000)
 
     model.unfreeze_encoder()
     loss = torch_em.loss.DiceLoss()
     trainer = torch_em.default_segmentation_trainer(
-        name="livecell-boundary-model",
+        name="livecell-boundary-model-ft",
         model=model,
         train_loader=train_loader,
         val_loader=val_loader,
@@ -84,7 +78,7 @@ def train_boundaries():
         mixed_precision=True,
         log_image_interval=50
     )
-    trainer.fit(iterations=1)
+    trainer.fit(iterations=50000)
 
 
 if __name__ == '__main__':

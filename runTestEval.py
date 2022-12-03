@@ -26,8 +26,7 @@ def eval2DUnet():
     g.manual_seed(0)
     
     test_loader = get_livecell_loader(
-        "/nfs/home/e7faffa3966db4c3/data", 
-        #"~/data/images",
+        "~/data",
         patch_shape, "test",
         boundaries=True, batch_size=batch_size,
         worker_init_fn=seed_worker,
@@ -65,7 +64,7 @@ def eval2DUnet():
 @torch.no_grad()
 def eval2DUnetR():
     patch_shape = [512, 512]
-    batch_size = 30
+    batch_size = 10
     
     def seed_worker(worker_id):
         worker_seed = torch.initial_seed() % 2**32
@@ -77,8 +76,7 @@ def eval2DUnetR():
     g.manual_seed(0)
     
     test_loader = get_livecell_loader(
-        "/nfs/home/e7faffa3966db4c3/data", 
-        #"~/data/images",
+        "~/data",
         patch_shape, "test",
         boundaries=True, batch_size=batch_size,
         worker_init_fn=seed_worker,

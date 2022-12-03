@@ -8,8 +8,6 @@ def train_boundaries():
     n_out = 2
     patch_shape = (512, 512)
     batch_size = 5
-    #patch_shape = (384, 384)
-    #batch_size = 3
     model = UNETR(
           in_channels=1,
           out_channels=n_out,
@@ -24,13 +22,12 @@ def train_boundaries():
 
     train_loader = get_livecell_loader(
         #"/nfs/home/e7faffa3966db4c3/data", 
-        "~/data/images",
+        "~/data",
         patch_shape, "train",
         download=True, boundaries=True, batch_size=batch_size
     )
     val_loader = get_livecell_loader(
-        #"/nfs/home/e7faffa3966db4c3/data", 
-        "~/data/images",
+        "~/data",
         patch_shape, "val",
         boundaries=True, batch_size=batch_size
     )
