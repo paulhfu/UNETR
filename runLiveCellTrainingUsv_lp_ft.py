@@ -122,7 +122,7 @@ def train_boundaries():
             conv_block = True,
             dropout_rate = 0.1,
             masking_ratio = 0.75,
-            masked_pretrain = True)
+            masked_pretrain = False)
         model.load_state_dict(torch.load("checkpoints/livecell-boundary-model-lp/best.pt")["model_state"])
         model.unfreeze_encoder()
         loss = torch_em.loss.DiceLoss()
