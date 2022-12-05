@@ -6,8 +6,8 @@ from torch_em.data.datasets import get_livecell_loader
 
 def train_boundaries():
     n_out = 2
-    patch_shape = (512, 512)
-    batch_size = 5
+    patch_shape = (64, 64)
+    batch_size = 1
     model = UNETR(
           in_channels=1,
           out_channels=n_out,
@@ -22,16 +22,19 @@ def train_boundaries():
 
     train_loader = get_livecell_loader(
         #"/home/e7faffa3966db4c3/data",
-        "~/data",
+        "/home/drford/data",
         patch_shape, "train",
         download=True, boundaries=True, batch_size=batch_size
     )
-    val_loader = get_livecell_loader(
-        #"/home/e7faffa3966db4c3/data",
-        "~/data",
-        patch_shape, "val",
-        boundaries=True, batch_size=batch_size
-    )
+    val_loader = train_loader
+    subsampling_indices = np.random.choice(len(image_paths), size=int(len(image_paths) * rnd_subsmpl_ratio), replace=False)
+    return [image_paths[i] for i in subsampling_indices], [seg_paths[i] for i in subsampling_indices]
+    #get_livecell_loader(
+    #    #"/home/e7faffa3966db4c3/data",
+    #    "/home/drford/data",
+    #    patch_shape, "val",
+    #    boundaries=True, batch_size=batch_size
+    #)
     loss = torch_em.loss.DiceLoss()
 
     trainer = torch_em.default_segmentation_trainer(
@@ -43,10 +46,10 @@ def train_boundaries():
         metric=loss,
         learning_rate=1e-4,
         device=torch.device("cuda"),
-        mixed_precision=True,
-        log_image_interval=50
+        mixed_precision=False,
+        log_image_interval=1,
     )
-    trainer.fit(iterations=50000)
+    trainer.fit(iterations=2)
 
 
 if __name__ == '__main__':
