@@ -16,7 +16,7 @@ import torch
 
 from UNETR.utils import trunc_normal_
 from UNETR.patchembedding_blocks import PatchEmbeddingBlock
-from UNETR.unetr_blocks import UnetResBlock, UnetrPrUpBlock, UnetrUpBlock
+from UNETR.unetr_blocks import UnetResBlock, UnetrPrUpBlock, UnetrUpBlock, UnetrUpBlockNoSkip
 from UNETR.unet_blocks import UnetOutBlock
 from UNETR.vit import ViT
 
@@ -162,14 +162,7 @@ class UNETR(nn.Module):
     def init_decoder_light(self, in_channels, feature_size, hidden_size, conv_block, out_channels):
         if self.masked_pretrain:
             self.mask_token = nn.Parameter(torch.zeros((1, 1, hidden_size)))
-        self.encoder = UnetResBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=in_channels,
-            out_channels=feature_size,
-            kernel_size=3,
-            stride=1
-        )
-        self.decoder = UnetrUpBlock(
+        self.decoder = UnetrUpBlockNoSkip(
             spatial_dims=self.spatial_dims,
             in_channels=hidden_size,
             out_channels=feature_size,
@@ -218,9 +211,8 @@ class UNETR(nn.Module):
         if self.masked_pretrain:  # we have to do this here, since after the decoders it is not possible to randomly subsample patches in different resolutions such that the exact same image regions are masked.
             mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
             x = torch.gather(torch.cat([x, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2])) + self.position_decoder_embed
-            enc = self.encoder(x_in)
             dec = self.proj_feat(x, self.hidden_size, self.feat_size)
-            dec = self.decoder(dec, enc)
+            dec = self.decoder(dec)
             logits = self.out(dec)
             return logits, mask, input_data
             

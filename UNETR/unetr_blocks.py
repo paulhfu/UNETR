@@ -6,6 +6,42 @@ import torch.nn as nn
 from UNETR.unet_blocks import UnetResBlock, get_conv_layer
 
 
+class UnetrUpBlockNoSkip(nn.Module):
+    def __init__(
+        self,
+        spatial_dims: int,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: Union[Sequence[int], int],
+        upsample_kernel_size: Union[Sequence[int], int],
+    ) -> None:
+
+        super().__init__()
+        upsample_stride = upsample_kernel_size
+        self.transp_conv = get_conv_layer(
+            spatial_dims,
+            in_channels,
+            out_channels,
+            kernel_size=upsample_kernel_size,
+            stride=upsample_stride,
+            conv_only=True,
+            is_transposed=True
+        )
+
+        self.conv_block = UnetResBlock(
+            spatial_dims,
+            out_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            stride=1
+        )
+
+    def forward(self, inp, skip):
+        # number of channels for skip should equals to out_channels
+        out = self.transp_conv(inp)
+        out = self.conv_block(out)
+        return out
+
 class UnetrUpBlock(nn.Module):
     def __init__(
         self,
