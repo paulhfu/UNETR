@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, "/home/e7faffa3966db4c3/Documents/torch-em")
 import torch
 from UNETR.model import UNETR
 from UNETR.mae_loss import MaeLoss
@@ -5,8 +7,8 @@ import torch_em
 from torch_em.data.datasets import get_livecell_loader
 from torch_em.trainer.tensorboard_logger import MaskedPretrainLogger
 
-masked_pretrain = False
-linear_probing = False
+masked_pretrain = True
+linear_probing = True
 finetune = True
 
 def train_boundaries():

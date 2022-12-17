@@ -36,7 +36,7 @@ class UnetrUpBlockNoSkip(nn.Module):
             stride=1
         )
 
-    def forward(self, inp, skip):
+    def forward(self, inp):
         # number of channels for skip should equals to out_channels
         out = self.transp_conv(inp)
         out = self.conv_block(out)
