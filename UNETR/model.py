@@ -30,6 +30,7 @@ class UNETR(nn.Module):
     and
     https://github.com/Project-MONAI/research-contributions/tree/main/UNETR/BTCV
     where used as starting points.
+    This needs: https://github.com/paulhfu/torch-em.git
     """
 
     def __init__(
