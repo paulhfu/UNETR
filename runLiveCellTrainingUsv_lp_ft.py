@@ -12,7 +12,7 @@ finetune = True
 def train_boundaries():
     patch_shape = (512, 512)
     if masked_pretrain:
-        batch_size = 64
+        batch_size = 25
         train_loader = get_livecell_loader(
             "/home/e7faffa3966db4c3/data",
             #"~/data",
