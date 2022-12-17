@@ -83,7 +83,10 @@ class UNETR(nn.Module):
             num_heads=num_heads,
             dropout_rate=dropout_rate,
         )
-        self.init_decoder(in_channels, feature_size, hidden_size, conv_block, out_channels)
+        if self.masked_pretrain:
+            self.init_decoder_light(in_channels, feature_size, hidden_size, conv_block, out_channels)
+        else:
+            self.init_decoder(in_channels, feature_size, hidden_size, conv_block, out_channels)
 
     def init_decoder(self, in_channels, feature_size, hidden_size, conv_block, out_channels):
         self.encoder1 = UnetResBlock(
@@ -155,6 +158,25 @@ class UNETR(nn.Module):
         )
         self.out = UnetOutBlock(spatial_dims=self.spatial_dims, in_channels=feature_size, out_channels=out_channels)  # type: ignore
 
+    def init_decoder_light(self, in_channels, feature_size, hidden_size, conv_block, out_channels):
+        if self.masked_pretrain:
+            self.mask_token = nn.Parameter(torch.zeros((1, 1, hidden_size)))
+        self.encoder = UnetResBlock(
+            spatial_dims=self.spatial_dims,
+            in_channels=in_channels,
+            out_channels=feature_size,
+            kernel_size=3,
+            stride=1
+        )
+        self.decoder = UnetrUpBlock(
+            spatial_dims=self.spatial_dims,
+            in_channels=hidden_size,
+            out_channels=feature_size,
+            kernel_size=3,
+            upsample_kernel_size=16
+        )
+        self.out = UnetOutBlock(spatial_dims=self.spatial_dims, in_channels=feature_size, out_channels=out_channels)  # type: ignore
+
     def freeze_encoder(self):
         for param in self.vit.parameters():
             param.requires_grad = False
@@ -179,6 +201,7 @@ class UNETR(nn.Module):
         return x
 
     def forward(self, x_in):
+        input_data = x_in.clone()
         x = self.patch_embedding(x_in)
         mask = None  # in case of unsupervised pretraining, this will bee needed by the loss to mask out unmasked patches.
         if self.masked_pretrain:
@@ -191,15 +214,18 @@ class UNETR(nn.Module):
             mask[:, :self.n_unmasked] = 0
             mask = torch.gather(mask, dim=1, index=ids_restore)
         x, hidden_states_out = self.vit(x)
-        x2 = hidden_states_out[3]
-        x3 = hidden_states_out[6]
-        x4 = hidden_states_out[9]
         if self.masked_pretrain:  # we have to do this here, since after the decoders it is not possible to randomly subsample patches in different resolutions such that the exact same image regions are masked.
             mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
             x = torch.gather(torch.cat([x, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2])) + self.position_decoder_embed
-            x2 = torch.gather(torch.cat([x2, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x2.shape[2])) + self.position_decoder_embed
-            x3 = torch.gather(torch.cat([x3, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x3.shape[2])) + self.position_decoder_embed
-            x4 = torch.gather(torch.cat([x4, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x4.shape[2])) + self.position_decoder_embed
+            enc = self.encoder(x_in)
+            dec = self.proj_feat(x, self.hidden_size, self.feat_size)
+            dec = self.decoder(dec, enc)
+            logits = self.out(dec)
+            return logits, mask, input_data
+            
+        x2 = hidden_states_out[3]
+        x3 = hidden_states_out[6]
+        x4 = hidden_states_out[9]
         enc1 = self.encoder1(x_in)
         enc2 = self.encoder2(self.proj_feat(x2, self.hidden_size, self.feat_size))
         enc3 = self.encoder3(self.proj_feat(x3, self.hidden_size, self.feat_size))
@@ -211,6 +237,4 @@ class UNETR(nn.Module):
         dec1 = self.decoder3(dec2, enc2)
         out = self.decoder2(dec1, enc1)
         logits = self.out(out)
-        if self.masked_pretrain: 
-            return logits, mask, x_in
         return logits

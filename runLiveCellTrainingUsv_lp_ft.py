@@ -3,6 +3,7 @@ from UNETR.model import UNETR
 from UNETR.mae_loss import MaeLoss
 import torch_em
 from torch_em.data.datasets import get_livecell_loader
+from torch_em.trainer.tensorboard_logger import MaskedPretrainLogger
 
 masked_pretrain = False
 linear_probing = False
@@ -11,7 +12,7 @@ finetune = True
 def train_boundaries():
     patch_shape = (512, 512)
     if masked_pretrain:
-        batch_size = 15
+        batch_size = 64
         train_loader = get_livecell_loader(
             "/home/e7faffa3966db4c3/data",
             #"~/data",
@@ -47,7 +48,7 @@ def train_boundaries():
             learning_rate=1e-4,
             device=torch.device("cuda"),
             mixed_precision=True,
-            logger=None,
+            logger=MaskedPretrainLogger,
             log_image_interval=50
         )
         trainer.fit(iterations=100000)
@@ -133,7 +134,7 @@ def train_boundaries():
             val_loader=val_loader,
             loss=loss,
             metric=loss,
-            learning_rate=1e-5,
+            learning_rate=5e-5,
             device=torch.device("cuda"),
             mixed_precision=True,
             log_image_interval=50
