@@ -95,85 +95,9 @@ class UNETR(nn.Module):
             num_heads=num_heads,
             dropout_rate=dropout_rate,
         )
-        if self.masked_pretrain:
-            self.init_decoder_light(in_channels, feature_size, hidden_size, conv_block, out_channels)
-        else:
-            self.init_decoder(in_channels, feature_size, hidden_size, conv_block, out_channels)
-
-    def init_decoder(self, in_channels, feature_size, hidden_size, conv_block, out_channels):
-        decoder_pos_embed = get_2d_sincos_pos_embed(self.decoder_pos_embed.shape[-1], int(self.n_patches**.5), cls_token=True)
-        #self.decoder_pos_embed.data.copy_(torch.from_numpy(decoder_pos_embed).float().unsqueeze(0))
-        self.encoder1 = UnetResBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=in_channels,
-            out_channels=feature_size,
-            kernel_size=3,
-            stride=1
-        )
-        self.encoder2 = UnetrPrUpBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=hidden_size,
-            out_channels=feature_size * 2,
-            num_layer=2,
-            kernel_size=3,
-            stride=1,
-            upsample_kernel_size=2,
-            conv_block=conv_block
-        )
-        self.encoder3 = UnetrPrUpBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=hidden_size,
-            out_channels=feature_size * 4,
-            num_layer=1,
-            kernel_size=3,
-            stride=1,
-            upsample_kernel_size=2,
-            conv_block=conv_block
-        )
-        self.encoder4 = UnetrPrUpBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=hidden_size,
-            out_channels=feature_size * 8,
-            num_layer=0,
-            kernel_size=3,
-            stride=1,
-            upsample_kernel_size=2,
-            conv_block=conv_block
-        )
-
-        self.decoder5 = UnetrUpBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=hidden_size,
-            out_channels=feature_size * 8,
-            kernel_size=3,
-            upsample_kernel_size=2
-        )
-        self.decoder4 = UnetrUpBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=feature_size * 8,
-            out_channels=feature_size * 4,
-            kernel_size=3,
-            upsample_kernel_size=2
-        )
-        self.decoder3 = UnetrUpBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=feature_size * 4,
-            out_channels=feature_size * 2,
-            kernel_size=3,
-            upsample_kernel_size=2
-        )
-        self.decoder2 = UnetrUpBlock(
-            spatial_dims=self.spatial_dims,
-            in_channels=feature_size * 2,
-            out_channels=feature_size,
-            kernel_size=3,
-            upsample_kernel_size=2
-        )
-        self.out = UnetOutBlock(spatial_dims=self.spatial_dims, in_channels=feature_size, out_channels=out_channels)  # type: ignore
-
-    def init_decoder_light(self, in_channels, feature_size, hidden_size, conv_block, out_channels):
-        self.mask_token = nn.Parameter(torch.zeros((1, 1, hidden_size)))
+        self.init_decoder(in_channels, feature_size, hidden_size, conv_block, out_channels)
         
+    def init_decoder(self, in_channels, feature_size, hidden_size, conv_block, out_channels):
         self.encoder2 = UnetrPrUpBlock(
             spatial_dims=self.spatial_dims,
             in_channels=hidden_size,
@@ -226,13 +150,32 @@ class UNETR(nn.Module):
             kernel_size=3,
             upsample_kernel_size=2
         )
-        self.decoder = UnetrUpBlockNoSkip(
-            spatial_dims=self.spatial_dims,
-            in_channels=feature_size * 2,
-            out_channels=feature_size,
-            kernel_size=3,
-            upsample_kernel_size=2
-        )
+        
+        if self.masked_pretrain:
+            self.decoder2 = UnetrUpBlockNoSkip(
+                spatial_dims=self.spatial_dims,
+                in_channels=feature_size * 2,
+                out_channels=feature_size,
+                kernel_size=3,
+                upsample_kernel_size=2
+            )
+            self.mask_token = nn.Parameter(torch.zeros((1, 1, hidden_size)))
+        else:
+            self.decoder2 = UnetrUpBlock(
+                spatial_dims=self.spatial_dims,
+                in_channels=feature_size * 2,
+                out_channels=feature_size,
+                kernel_size=3,
+                upsample_kernel_size=2
+            )
+            self.encoder1 = UnetResBlock(
+                spatial_dims=self.spatial_dims,
+                in_channels=in_channels,
+                out_channels=feature_size,
+                kernel_size=3,
+                stride=1
+            )
+        
         self.out = UnetOutBlock(spatial_dims=self.spatial_dims, in_channels=feature_size, out_channels=out_channels)  # type: ignore
 
     def freeze_encoder(self):
@@ -290,9 +233,9 @@ class UNETR(nn.Module):
             dec3 = self.decoder5(self.proj_feat(x, self.hidden_size, self.feat_size), enc4)
             dec2 = self.decoder4(dec3, enc3)
             dec1 = self.decoder3(dec2, enc2)
-            out = self.decoder(dec1)
+            out = self.decoder2(dec1)
             logits = self.out(out)
-            return logits, mask, input_data
+            return [logits, mask, input_data]
             
         enc1 = self.encoder1(x_in)
         enc2 = self.encoder2(self.proj_feat(x2, self.hidden_size, self.feat_size))
