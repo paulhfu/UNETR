@@ -20,17 +20,74 @@ from UNETR.utils import trunc_normal_
 
 SUPPORTED_EMBEDDING_TYPES = {"conv", "perceptron"}
 
+class SquarePatchingBlock(nn.Module):
+    def __init__(
+        self,
+        img_size: Union[Sequence[int], int],
+        patch_size: Union[Sequence[int], int],
+        spatial_dims: int = 3,
+    ):
+        super().__init__()
+        for m, p in zip(img_size, patch_size):
+            if m < p:
+                raise ValueError("patch_size should be smaller than img_size.")
+        self.patch_size = patch_size
+        self.n_patches = [im_d // p_d for im_d, p_d in zip(img_size, patch_size)]
+        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:spatial_dims]
+        from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+        to_chars = f"b ({' '.join([c[0] for c in chars])}) ({' '.join([c[1] for c in chars])} c)"
+        axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
+        self.patches = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)
+        self.patchesInverse = Rearrange(f"{to_chars} -> {from_chars}", h=self.n_patches[0], w=self.n_patches[1], **axes_len)
+        self.n_patches = np.prod(self.n_patches)
+        
+    def forward(self, x):
+        x = self.patches(x)
+        return x
 
-class PatchEmbeddingBlock(nn.Module):
+    def inversePatching(self, x):
+        x = self.patchesInverse(x)
+        return x
+        
+class LinePatchingBlock(nn.Module):
+    def __init__(
+        self,
+        img_size: Union[Sequence[int], int],
+        patch_size: Union[Sequence[int], int],
+        spatial_dims: int = 3,
+    ):
+        super().__init__()
+        for m, p in zip(img_size, patch_size):
+            if m < p:
+                raise ValueError("patch_size should be smaller than img_size.")
+        patch_size = max(img_size[0], np.prod(patch_size))
+        self.n_patches = np.prod(img_size) // patch_size
+        
+        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:spatial_dims]
+        from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
+        to_chars = f"b ({' '.join([c[0] for c in chars])}) ({' '.join([c[1] for c in chars])} c)"
+        axes_len = {f"p{i+1}": p for i, p in enumerate([patch_size, 1])}
+        self.patches = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)
+        self.patchesInverse = Rearrange(f"{to_chars} -> {from_chars}", h=self.n_patches, w=img_size[1], **axes_len)
+        
+    def forward(self, x):
+        x = self.patches(x)
+        return x
+
+    def inversePatching(self, x):
+        x = self.patchesInverse(x)
+        return x
+
+class EmbeddingBlock(nn.Module):
     def __init__(
         self,
         in_channels: int,
+        n_patches: int,
         img_size: Union[Sequence[int], int],
         patch_size: Union[Sequence[int], int],
         hidden_size: int,
         num_heads: int,
         dropout_rate: float = 0.0,
-        spatial_dims: int = 3,
     ) -> None:
         super().__init__()
 
@@ -43,18 +100,13 @@ class PatchEmbeddingBlock(nn.Module):
         for m, p in zip(img_size, patch_size):
             if m < p:
                 raise ValueError("patch_size should be smaller than img_size.")
-        self.n_patches = np.prod([im_d // p_d for im_d, p_d in zip(img_size, patch_size)])
+        self.n_patches = n_patches
         self.patch_dim = int(in_channels * np.prod(patch_size))
+        self.embeddings = nn.Linear(self.patch_dim, hidden_size)
 
-        convCtor = nn.Conv3d if spatial_dims == 3 else nn.Conv2d
+        #convCtor = nn.Conv3d if spatial_dims == 3 else nn.Conv2d
         #self.patch_embeddings = convCtor(in_channels=in_channels, out_channels=hidden_size, kernel_size=patch_size, stride=patch_size)
         # for 3d: "b c (h p1) (w p2) (d p3)-> b (h w d) (p1 p2 p3 c)"
-        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:spatial_dims]
-        from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        to_chars = f"b ({' '.join([c[0] for c in chars])}) ({' '.join([c[1] for c in chars])} c)"
-        axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
-        self.patches = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)
-        self.embeddings = nn.Linear(self.patch_dim, hidden_size)
 
         self.position_embeddings = nn.Parameter(torch.zeros(1, self.n_patches, hidden_size))
         self.cls_token = nn.Parameter(torch.zeros(1, 1, hidden_size))  # Prob not needed
@@ -72,8 +124,7 @@ class PatchEmbeddingBlock(nn.Module):
             nn.init.constant_(m.weight, 1.0)
 
     def forward(self, x):
-        x_patched = self.patches(x)
-        x = self.embeddings(x_patched)
+        x = self.embeddings(x)
         #x = x.flatten(2).transpose(-1, -2)
         embeddings = x + self.position_embeddings
         embeddings = self.dropout(embeddings)
