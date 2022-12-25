@@ -20,5 +20,5 @@ class MaeLoss(nn.Module):
     loss = loss.mean(dim=-1)
     loss = (loss * mask).sum() / mask.sum()
     spatial_mask = self.patchesInverse(self.patches(torch.ones_like(pred)) * mask[..., None])
-    src[1] = spatial_mask
+    src.append(spatial_mask)
     return loss
