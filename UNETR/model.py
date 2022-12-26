@@ -235,7 +235,7 @@ class UNETR(nn.Module):
             dec1 = self.decoder3(dec2, enc2)
             out = self.decoder2(dec1)
             logits = self.out(out)
-            return [logits, mask, input_data]
+            return [logits, mask, input_data, self.patch.inversePatching(self.patch(torch.ones_like(logits)) * mask[..., None])]
             
         enc1 = self.encoder1(x_in)
         enc2 = self.encoder2(self.proj_feat(x2, self.hidden_size, self.feat_size))
