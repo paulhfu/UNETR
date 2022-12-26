@@ -66,7 +66,7 @@ class UNETR(nn.Module):
                 assert s % 256 == 0
         self.spatial_dims = len(img_size)
         self.num_layers = 12
-        self.patch_size = (16,) * self.spatial_dims if patch_shape == "square" else (img_size[0], ) + (1, ) * (self.spatial_dims - 1)
+        self.patch_size = (16,) * self.spatial_dims if patch_shape == "square" else (256, ) + (1, ) * (self.spatial_dims - 1)
         self.patch_sqr_size = (16,) * self.spatial_dims
         self.feat_size = tuple((simg // spatch for simg, spatch in zip(img_size, self.patch_size)))
         self.n_patches = torch.tensor(self.feat_size).prod().item()

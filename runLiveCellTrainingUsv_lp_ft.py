@@ -14,7 +14,7 @@ finetune = True
 def train_boundaries():
     patch_shape = (512, 512)
     if masked_pretrain:
-        batch_size = 12
+        batch_size = 10
         train_loader = get_livecell_loader(
             "/home/e7faffa3966db4c3/data",
             #"~/data",
@@ -39,7 +39,7 @@ def train_boundaries():
             dropout_rate = 0.1,
             masking_ratio = 0.4,
             masked_pretrain = True,
-            patch_shape="square")
+            patch_shape="line")
         
         loss = MaeLoss()
         
