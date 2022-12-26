@@ -19,12 +19,13 @@ from einops.layers.torch import Rearrange
 from UNETR.utils import trunc_normal_
 
 SUPPORTED_EMBEDDING_TYPES = {"conv", "perceptron"}
-
-class SquarePatchingBlock(nn.Module):
+        
+class RectPatchingBlock(nn.Module):
     def __init__(
         self,
         img_size: Union[Sequence[int], int],
         patch_size: Union[Sequence[int], int],
+        patch_sqr_size: Sequence[int],
         spatial_dims: int = 3,
     ):
         super().__init__()
@@ -33,12 +34,16 @@ class SquarePatchingBlock(nn.Module):
                 raise ValueError("patch_size should be smaller than img_size.")
         self.patch_size = patch_size
         self.n_patches = [im_d // p_d for im_d, p_d in zip(img_size, patch_size)]
+        self.n_sqrPatches = [im_d // p_d for im_d, p_d in zip(img_size, patch_sqr_size)]
         chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:spatial_dims]
         from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
         to_chars = f"b ({' '.join([c[0] for c in chars])}) ({' '.join([c[1] for c in chars])} c)"
-        axes_len = {f"p{i+1}": p for i, p in enumerate(patch_size)}
+        axes_len = {f"p{i+1}": p for i, p in enumerate(self.patch_size)}
         self.patches = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)
         self.patchesInverse = Rearrange(f"{to_chars} -> {from_chars}", h=self.n_patches[0], w=self.n_patches[1], **axes_len)
+        axes_len = {f"p{i+1}": p for i, p in enumerate(patch_sqr_size)}
+        to_chars = f"b {' '.join([c[0] for c in chars])} ({' '.join([c[1] for c in chars])} c)"
+        self.patchesRect = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)
         self.n_patches = np.prod(self.n_patches)
         
     def forward(self, x):
@@ -48,34 +53,11 @@ class SquarePatchingBlock(nn.Module):
     def inversePatching(self, x):
         x = self.patchesInverse(x)
         return x
-        
-class LinePatchingBlock(nn.Module):
-    def __init__(
-        self,
-        img_size: Union[Sequence[int], int],
-        patch_size: Union[Sequence[int], int],
-        spatial_dims: int = 3,
-    ):
-        super().__init__()
-        for m, p in zip(img_size, patch_size):
-            if m < p:
-                raise ValueError("patch_size should be smaller than img_size.")
-        patch_size = max(img_size[0], np.prod(patch_size))
-        self.n_patches = np.prod(img_size) // patch_size
-        
-        chars = (("h", "p1"), ("w", "p2"), ("d", "p3"))[:spatial_dims]
-        from_chars = "b c " + " ".join(f"({k} {v})" for k, v in chars)
-        to_chars = f"b ({' '.join([c[0] for c in chars])}) ({' '.join([c[1] for c in chars])} c)"
-        axes_len = {f"p{i+1}": p for i, p in enumerate([patch_size, 1])}
-        self.patches = Rearrange(f"{from_chars} -> {to_chars}", **axes_len)
-        self.patchesInverse = Rearrange(f"{to_chars} -> {from_chars}", h=self.n_patches, w=img_size[1], **axes_len)
-        
-    def forward(self, x):
-        x = self.patches(x)
-        return x
-
-    def inversePatching(self, x):
+    
+    def projectFeatures(self, x):
         x = self.patchesInverse(x)
+        x = self.patchesRect(x)
+        x = x.permute(0, 3, 1, 2).contiguous()
         return x
 
 class EmbeddingBlock(nn.Module):

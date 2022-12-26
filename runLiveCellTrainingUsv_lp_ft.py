@@ -38,9 +38,10 @@ def train_boundaries():
             conv_block = True,
             dropout_rate = 0.1,
             masking_ratio = 0.4,
-            masked_pretrain = True)
+            masked_pretrain = True,
+            patch_shape="square")
         
-        loss = MaeLoss(2, 16, [s // 16 for s in patch_shape])
+        loss = MaeLoss()
         
         trainer = torch_em.default_segmentation_trainer(
             name="livecell-mae",

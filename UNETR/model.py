@@ -1,7 +1,7 @@
 # Copyright 2020 - 2021 MONAI Consortium
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# You may obtain a copy of the License at(16,) * self.spatial_dims
 #     http://www.apache.org/licenses/LICENSE-2.0
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -10,12 +10,13 @@
 # limitations under the License.
 
 from typing import Tuple
+import math
 
 import torch.nn as nn
 import torch
 
 from UNETR.utils import trunc_normal_, get_2d_sincos_pos_embed
-from UNETR.patchembedding_blocks import EmbeddingBlock, SquarePatchingBlock, LinePatchingBlock
+from UNETR.patchembedding_blocks import EmbeddingBlock, RectPatchingBlock
 from UNETR.unetr_blocks import UnetResBlock, UnetrPrUpBlock, UnetrUpBlock, UnetrUpBlockNoSkip
 from UNETR.unet_blocks import UnetOutBlock
 from UNETR.vit import ViT
@@ -57,9 +58,16 @@ class UNETR(nn.Module):
         if hidden_size % num_heads != 0:
             raise AssertionError("hidden size should be divisible by num_heads.")
         assert patch_shape in ["square", "line"]
+        if patch_shape == "square":
+            for s in img_size:
+                assert s % 16 == 0
+        else:
+            for s in img_size[:-1]:
+                assert s % 256 == 0
         self.spatial_dims = len(img_size)
         self.num_layers = 12
-        self.patch_size = (16,) * self.spatial_dims
+        self.patch_size = (16,) * self.spatial_dims if patch_shape == "square" else (img_size[0], ) + (1, ) * (self.spatial_dims - 1)
+        self.patch_sqr_size = (16,) * self.spatial_dims
         self.feat_size = tuple((simg // spatch for simg, spatch in zip(img_size, self.patch_size)))
         self.n_patches = torch.tensor(self.feat_size).prod().item()
         self.hidden_size = hidden_size
@@ -70,12 +78,12 @@ class UNETR(nn.Module):
         #self.position_decoder_embed = nn.Parameter(torch.zeros(1, self.n_patches, hidden_size))
         #trunc_normal_(self.position_decoder_embed, mean=0.0, std=0.02, a=-2.0, b=2.0)
         self.decoder_pos_embed = nn.Parameter(torch.zeros(1, self.n_patches + 1, self.hidden_size), requires_grad=False)
-        patching_class = SquarePatchingBlock if patch_shape == "square" else LinePatchingBlock
             
-        self.patch = patching_class(
+        self.patch = RectPatchingBlock(
             img_size=img_size,
             patch_size=self.patch_size,
             spatial_dims=self.spatial_dims,
+            patch_sqr_size=self.patch_sqr_size
         )
         self.n_patches = self.patch.n_patches
         self.patch_size = self.patch.patch_size
@@ -192,15 +200,6 @@ class UNETR(nn.Module):
     def enable_masking(self):
         self.masked_pretrain = True
 
-    def proj_feat(self, x, hidden_size, feat_size):
-        if self.spatial_dims == 3:
-            x = x.view(x.size(0), feat_size[0], feat_size[1], feat_size[2], hidden_size)
-            x = x.permute(0, 4, 1, 2, 3).contiguous()
-        else:
-            x = x.view(x.size(0), feat_size[0], feat_size[1], hidden_size)
-            x = x.permute(0, 3, 1, 2).contiguous()
-        return x
-
     def forward(self, x_in):
         input_data = x_in.clone()
         x = self.patch(x_in)
@@ -226,16 +225,16 @@ class UNETR(nn.Module):
             x3 = torch.gather(torch.cat([x3, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x3.shape[2]))
             x4 = torch.gather(torch.cat([x4, mask_tokens], dim=1), dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x4.shape[2]))
             #x = x + self.decoder_pos_embed
-            enc2 = self.encoder2(self.proj_feat(x2, self.hidden_size, self.feat_size))
-            enc3 = self.encoder3(self.proj_feat(x3, self.hidden_size, self.feat_size))
-            enc4 = self.encoder4(self.proj_feat(x4, self.hidden_size, self.feat_size))
+            enc2 = self.encoder2(self.patch.projectFeatures(x2))
+            enc3 = self.encoder3(self.patch.projectFeatures(x3))
+            enc4 = self.encoder4(self.patch.projectFeatures(x4))
 
-            dec3 = self.decoder5(self.proj_feat(x, self.hidden_size, self.feat_size), enc4)
+            dec3 = self.decoder5(self.patch.projectFeatures(x), enc4)
             dec2 = self.decoder4(dec3, enc3)
             dec1 = self.decoder3(dec2, enc2)
             out = self.decoder2(dec1)
             logits = self.out(out)
-            return [logits, mask, input_data, self.patch.inversePatching(self.patch(torch.ones_like(logits)) * mask[..., None])]
+            return [logits, mask, input_data, self.patch]
             
         enc1 = self.encoder1(x_in)
         enc2 = self.encoder2(self.proj_feat(x2, self.hidden_size, self.feat_size))
