@@ -15,10 +15,9 @@ class MaeLoss(nn.Module):
     self.patchesInverse = Rearrange(f"{to_chars} -> {from_chars}", h=n_patches[0], w=n_patches[1], **axes_len)
 
   def forward(self, src, _):
-    pred, mask, inp = src
-    loss = (self.patches(pred) - self.patches(inp)) ** 2
+    loss = (self.patches(src[0]) - self.patches(src[2])) ** 2
     loss = loss.mean(dim=-1)
-    loss = (loss * mask).sum() / mask.sum()
-    spatial_mask = self.patchesInverse(self.patches(torch.ones_like(pred)) * mask[..., None])
+    loss = (loss * src[1]).sum() / src[1].sum()
+    spatial_mask = self.patchesInverse(self.patches(torch.ones_like(src[0])) * src[1][..., None])
     src.append(spatial_mask)
     return loss
