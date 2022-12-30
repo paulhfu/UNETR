@@ -7,12 +7,14 @@ import torch_em
 from torch_em.data.datasets import get_livecell_loader
 from torch_em.trainer.tensorboard_logger import MaskedPretrainLogger
 
-masked_pretrain = True
+masked_pretrain = False
 linear_probing = True
 finetune = True
 
 def train_boundaries():
     patch_shape = (512, 512)
+    ps = 'line'
+    mr = 0.4
     if masked_pretrain:
         batch_size = 10
         train_loader = get_livecell_loader(
@@ -37,9 +39,9 @@ def train_boundaries():
             num_heads = 12,
             conv_block = True,
             dropout_rate = 0.1,
-            masking_ratio = 0.4,
+            masking_ratio = mr,
             masked_pretrain = True,
-            patch_shape="line")
+            patch_shape=ps)
         
         loss = MaeLoss()
         
@@ -56,7 +58,7 @@ def train_boundaries():
             logger=MaskedPretrainLogger,
             log_image_interval=50
         )
-        trainer.fit(iterations=100000)
+        trainer.fit(iterations=40000)
 
     if linear_probing:
         batch_size = 5
@@ -82,8 +84,9 @@ def train_boundaries():
             num_heads = 12,
             conv_block = True,
             dropout_rate = 0.1,
-            masking_ratio = 0.75,
-            masked_pretrain = True)
+            masking_ratio = mr,
+            masked_pretrain = True,
+            patch_shape=ps)
         model.load_state_dict(torch.load("checkpoints/livecell-mae/best.pt")["model_state"])
         model.init_decoder(in_channels=1, feature_size=16, hidden_size=768, conv_block=True, out_channels=2)
         model.freeze_encoder()
@@ -127,8 +130,9 @@ def train_boundaries():
             num_heads = 12,
             conv_block = True,
             dropout_rate = 0.1,
-            masking_ratio = 0.75,
-            masked_pretrain = False)
+            masking_ratio = mr,
+            masked_pretrain = False,
+            patch_shape=ps)
         model.load_state_dict(torch.load("checkpoints/livecell-boundary-model-lp/best.pt")["model_state"])
         model.unfreeze_encoder()
         loss = torch_em.loss.DiceLoss()

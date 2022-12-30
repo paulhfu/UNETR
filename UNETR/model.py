@@ -103,9 +103,9 @@ class UNETR(nn.Module):
             num_heads=num_heads,
             dropout_rate=dropout_rate,
         )
-        self.init_decoder(in_channels, feature_size, hidden_size, conv_block, out_channels)
+        self.init_decoder(in_channels, feature_size, hidden_size, conv_block, out_channels, self.masked_pretrain)
         
-    def init_decoder(self, in_channels, feature_size, hidden_size, conv_block, out_channels):
+    def init_decoder(self, in_channels, feature_size, hidden_size, conv_block, out_channels, masked_pretrain):
         self.encoder2 = UnetrPrUpBlock(
             spatial_dims=self.spatial_dims,
             in_channels=hidden_size,
@@ -159,7 +159,7 @@ class UNETR(nn.Module):
             upsample_kernel_size=2
         )
         
-        if self.masked_pretrain:
+        if masked_pretrain:
             self.decoder2 = UnetrUpBlockNoSkip(
                 spatial_dims=self.spatial_dims,
                 in_channels=feature_size * 2,
