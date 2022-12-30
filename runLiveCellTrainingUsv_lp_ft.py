@@ -88,7 +88,7 @@ def train_boundaries():
             masked_pretrain = True,
             patch_shape=ps)
         model.load_state_dict(torch.load("checkpoints/livecell-mae/best.pt")["model_state"])
-        model.init_decoder(in_channels=1, feature_size=16, hidden_size=768, conv_block=True, out_channels=2)
+        model.init_decoder(in_channels=1, feature_size=16, hidden_size=768, conv_block=True, out_channels=2, masked_pretrain=False)
         model.freeze_encoder()
         model.disable_masking()
         loss = torch_em.loss.DiceLoss()

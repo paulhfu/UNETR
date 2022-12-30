@@ -237,11 +237,11 @@ class UNETR(nn.Module):
             return [logits, mask, input_data, self.patch]
             
         enc1 = self.encoder1(x_in)
-        enc2 = self.encoder2(self.proj_feat(x2, self.hidden_size, self.feat_size))
-        enc3 = self.encoder3(self.proj_feat(x3, self.hidden_size, self.feat_size))
-        enc4 = self.encoder4(self.proj_feat(x4, self.hidden_size, self.feat_size))
+        enc2 = self.encoder2(self.patch.projectFeatures(x2))
+        enc3 = self.encoder3(self.patch.projectFeatures(x3))
+        enc4 = self.encoder4(self.patch.projectFeatures(x4))
 
-        dec4 = self.proj_feat(x, self.hidden_size, self.feat_size)
+        dec4 = self.patch.projectFeatures(x)
         dec3 = self.decoder5(dec4, enc4)
         dec2 = self.decoder4(dec3, enc3)
         dec1 = self.decoder3(dec2, enc2)
