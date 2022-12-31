@@ -167,6 +167,7 @@ class UNETR(nn.Module):
                 kernel_size=3,
                 upsample_kernel_size=2
             )
+            self.encoder1 = None
             self.mask_token = nn.Parameter(torch.zeros((1, 1, hidden_size)))
         else:
             self.decoder2 = UnetrUpBlock(
@@ -183,6 +184,7 @@ class UNETR(nn.Module):
                 kernel_size=3,
                 stride=1
             )
+            self.mask_token = None
         
         self.out = UnetOutBlock(spatial_dims=self.spatial_dims, in_channels=feature_size, out_channels=out_channels)  # type: ignore
 
