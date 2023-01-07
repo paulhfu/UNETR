@@ -5,20 +5,20 @@ from torch_em.data.datasets import get_livecell_loader
 
 
 def train_boundaries():
-    n_out = 2
     patch_shape = (512, 512)
+    ps = 'line' # square, line
     batch_size = 5
     model = UNETR(
-          in_channels=1,
-          out_channels=n_out,
-          img_size=patch_shape,
-          feature_size = 16,
-          hidden_size = 768,
-          mlp_dim = 3072,
-          num_heads = 12,
-          conv_block = True,
-          dropout_rate = 0.1,
-          masked_pretrain = False)
+            in_channels=1,
+            out_channels=2,
+            img_size=patch_shape,
+            feature_size = 16,
+            hidden_size = 768,
+            mlp_dim = 3072,
+            num_heads = 12,
+            conv_block = True,
+            dropout_rate = 0.1,
+            patch_shape=ps)
 
     train_loader = get_livecell_loader(
         #"/home/e7faffa3966db4c3/data",
