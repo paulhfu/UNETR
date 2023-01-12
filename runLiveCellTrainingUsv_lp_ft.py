@@ -121,8 +121,11 @@ def train_boundaries():
             conv_block = True,
             dropout_rate = 0.1,
             masking_ratio = mr,
-            masked_pretrain = False,
+            masked_pretrain = True,
             patch_shape=ps)
+        model.init_decoder(in_channels=1, feature_size=16, hidden_size=768, conv_block=True, out_channels=2, masked_pretrain=False)
+        model.freeze_encoder()
+        model.disable_masking()
         model.load_state_dict(torch.load("checkpoints/livecell-boundary-model-lp/best.pt")["model_state"])
         model.unfreeze_encoder()
         loss = torch_em.loss.DiceLoss()
@@ -133,7 +136,7 @@ def train_boundaries():
             val_loader=val_loader,
             loss=loss,
             metric=loss,
-            learning_rate=5e-5,
+            learning_rate=1e-4,
             device=torch.device("cuda"),
             mixed_precision=True,
             log_image_interval=50

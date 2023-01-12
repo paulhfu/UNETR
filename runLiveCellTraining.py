@@ -21,14 +21,14 @@ def train_boundaries():
             patch_shape=ps)
 
     train_loader = get_livecell_loader(
-        #"/home/e7faffa3966db4c3/data",
-        "~/data",
+        "/home/e7faffa3966db4c3/data",
+        #"~/data",
         patch_shape, "train",
         download=True, boundaries=True, batch_size=batch_size
     )
     val_loader = get_livecell_loader(
-        #"/home/e7faffa3966db4c3/data",
-        "~/data",
+        "/home/e7faffa3966db4c3/data",
+        #"~/data",
         patch_shape, "val",
         boundaries=True, batch_size=batch_size
     )
