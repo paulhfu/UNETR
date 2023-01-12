@@ -32,6 +32,7 @@ class UNETR(nn.Module):
     https://github.com/Project-MONAI/research-contributions/tree/main/UNETR/BTCV
     where used as starting points.
     This needs: https://github.com/paulhfu/torch-em.git
+    export PYTHONPATH=$PYTHONPATH:/nfs/home/e7faffa3966db4c3/Documents/torch-em
     """
 
     def __init__(
@@ -63,10 +64,10 @@ class UNETR(nn.Module):
                 assert s % 16 == 0
         else:
             for s in img_size[:-1]:
-                assert s % 256 == 0
+                assert s % 32 == 0
         self.spatial_dims = len(img_size)
         self.num_layers = 12
-        self.patch_size = (16,) * self.spatial_dims if patch_shape == "square" else (256, ) + (1, ) * (self.spatial_dims - 1)
+        self.patch_size = (16,) * self.spatial_dims if patch_shape == "square" else (32, 8) * (self.spatial_dims - 1)
         self.patch_sqr_size = (16,) * self.spatial_dims
         self.feat_size = tuple((simg // spatch for simg, spatch in zip(img_size, self.patch_size)))
         self.n_patches = torch.tensor(self.feat_size).prod().item()

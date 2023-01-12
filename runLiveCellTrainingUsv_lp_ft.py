@@ -7,7 +7,7 @@ import torch_em
 from torch_em.data.datasets import get_livecell_loader
 from torch_em.trainer.tensorboard_logger import MaskedPretrainLogger
 
-masked_pretrain = False
+masked_pretrain = True
 linear_probing = True
 finetune = True
 
@@ -15,6 +15,7 @@ def train_boundaries():
     patch_shape = (512, 512)
     ps = 'line'
     mr = 0.4
+    sv_data_ratio = 0.6
     if masked_pretrain:
         batch_size = 10
         train_loader = get_livecell_loader(
@@ -59,14 +60,13 @@ def train_boundaries():
             log_image_interval=50
         )
         trainer.fit(iterations=40000)
-
-    if linear_probing:
-        batch_size = 5
+        
+    if linear_probing or finetune:
         train_loader = get_livecell_loader(
             "/home/e7faffa3966db4c3/data",
             #"~/data",
             patch_shape, "train",
-            download=True, boundaries=True, batch_size=batch_size
+            download=True, boundaries=True, batch_size=batch_size, rnd_subsmpl_ratio=sv_data_ratio
         )
         val_loader = get_livecell_loader(
             "/home/e7faffa3966db4c3/data",
@@ -74,6 +74,8 @@ def train_boundaries():
             patch_shape, "val",
             boundaries=True, batch_size=batch_size
         )
+    if linear_probing:
+        batch_size = 5
         model = UNETR(
             in_channels=1,
             out_channels=1,
@@ -108,18 +110,6 @@ def train_boundaries():
 
     if finetune:
         batch_size = 5
-        train_loader = get_livecell_loader(
-            "/home/e7faffa3966db4c3/data",
-            #"~/data",
-            patch_shape, "train",
-            download=True, boundaries=True, batch_size=batch_size
-        )
-        val_loader = get_livecell_loader(
-            "/home/e7faffa3966db4c3/data",
-            #"~/data",
-            patch_shape, "val",
-            boundaries=True, batch_size=batch_size
-        )
         model = UNETR(
             in_channels=1,
             out_channels=2,
