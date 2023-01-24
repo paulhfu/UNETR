@@ -63,6 +63,7 @@ def train_boundaries():
         trainer.fit(iterations=40000)
         
     if linear_probing or finetune or noPretrainComparison:
+        batch_size = 5
         train_loader = get_livecell_loader(
             "/home/e7faffa3966db4c3/data",
             #"~/data",
@@ -76,7 +77,6 @@ def train_boundaries():
             boundaries=True, batch_size=batch_size
         )
     if linear_probing:
-        batch_size = 5
         model = UNETR(
             in_channels=1,
             out_channels=1,
@@ -110,7 +110,6 @@ def train_boundaries():
         trainer.fit(iterations=50000)
 
     if finetune:
-        batch_size = 5
         model = UNETR(
             in_channels=1,
             out_channels=2,
