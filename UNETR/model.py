@@ -14,6 +14,7 @@ import math
 
 import torch.nn as nn
 import torch
+import random
 
 from UNETR.utils import trunc_normal_, get_2d_sincos_pos_embed
 from UNETR.patchembedding_blocks import EmbeddingBlock, RectPatchingBlock
@@ -211,6 +212,8 @@ class UNETR(nn.Module):
         if self.masked_pretrain:
             noise = torch.rand(x.shape[:2], device=x.device)
             mask = torch.ones(x.shape[:2], device=x.device)
+            coin = random.randint(0, 1)
+            noise[:, coin:2:] += 1
             ids_shuffle = torch.argsort(noise, dim=1)
             ids_restore = torch.argsort(ids_shuffle, dim=1)
             ids_keep = ids_shuffle[:, :self.n_unmasked]
